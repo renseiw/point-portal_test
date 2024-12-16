@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Babylon.js AR - Über dem Objekt</title>
+    <title>Babylon.js AR Debug</title>
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
     <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
 </head>
 <body>
     <canvas id="renderCanvas" touch-action="none" style="width: 100vw; height: 100vh; display: block;"></canvas>
+    <button id="start-ar" style="position: absolute; top: 10px; left: 10px; z-index: 10;">Start AR</button>
     <script>
         const canvas = document.getElementById("renderCanvas");
         const engine = new BABYLON.Engine(canvas, true);
@@ -17,65 +18,38 @@
         let scene, xrHelper, circle, quads = [];
 
         async function createScene() {
+            // Scene setup
             scene = new BABYLON.Scene(engine);
-
-            // Licht hinzufügen
+            scene.clearColor = new BABYLON.Color4(0, 0, 0, 0); // Transparent background
             const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
 
-            // WebXR-Erlebnis starten
+            // Initialize XR experience
             xrHelper = await scene.createDefaultXRExperienceAsync({
-                floorMeshes: [] // Bodenanker (falls benötigt)
+                floorMeshes: []
             });
 
-            // Kreis erstellen und auf dem Boden platzieren
-            circle = BABYLON.MeshBuilder.CreateDisc("circle", { radius: 0.55, tessellation: 64 }, scene);
-            const circleMaterial = new BABYLON.StandardMaterial("circleMaterial", scene);
-            circleMaterial.diffuseColor = new BABYLON.Color3(0, 0.5, 1);
-            circle.material = circleMaterial;
-            circle.position.y = 0.01; // Minimal über dem Boden platzieren
+            // Create a basic object for testing
+            const box = BABYLON.MeshBuilder.CreateBox("box", { size: 0.2 }, scene);
+            box.position.set(0, 1, 0);
 
-            // Überprüfung, ob der Benutzer über dem Kreis steht
-            xrHelper.baseExperience.sessionManager.onXRFrameObservable.add(() => {
-                const devicePosition = xrHelper.baseExperience.camera.position;
+            // Add AR session button functionality
+            document.getElementById("start-ar").addEventListener("click", () => {
+                xrHelper.baseExperience.enterXRAsync("immersive-ar", "local-floor").then(() => {
+                    console.log("AR session started");
 
-                if (isOverCircle(devicePosition, circle.position) && quads.length === 0) {
-                    addQuadsAroundCircle();
-                }
+                    // Add the circle when AR session starts
+                    circle = BABYLON.MeshBuilder.CreateDisc("circle", { radius: 0.55, tessellation: 64 }, scene);
+                    const circleMaterial = new BABYLON.StandardMaterial("circleMaterial", scene);
+                    circleMaterial.diffuseColor = new BABYLON.Color3(0, 0.5, 1);
+                    circle.material = circleMaterial;
+                    circle.position.y = 0.01; // Slightly above the floor
+                }).catch(console.error);
             });
 
             return scene;
         }
 
-        function isOverCircle(userPosition, circlePosition) {
-            const dx = userPosition.x - circlePosition.x; // Abstand in x-Richtung
-            const dz = userPosition.z - circlePosition.z; // Abstand in z-Richtung
-            const distance = Math.sqrt(dx * dx + dz * dz); // Euklidische Distanz berechnen
-
-            return distance <= 0.55; // Benutzer steht über dem Kreis, wenn der Abstand <= Radius ist
-        }
-
-        function addQuadsAroundCircle() {
-            const quadMaterial = new BABYLON.StandardMaterial("quadMaterial", scene);
-            quadMaterial.diffuseColor = new BABYLON.Color3(1, 0, 0);
-
-            const positions = [
-                { x: 0.6, z: 0 },  // Rechts vom Kreis
-                { x: -0.6, z: 0 }, // Links vom Kreis
-                { x: 0, z: 0.6 },  // Vor dem Kreis
-                { x: 0, z: -0.6 }  // Hinter dem Kreis
-            ];
-
-            positions.forEach((pos) => {
-                const quad = BABYLON.MeshBuilder.CreateBox("quad", { size: 0.2 }, scene);
-                quad.material = quadMaterial;
-
-                // Platzierung relativ zum Kreis
-                quad.position.set(circle.position.x + pos.x, 0.1, circle.position.z + pos.z);
-                quads.push(quad);
-            });
-        }
-
-        // Render-Loop starten
+        // Render loop
         engine.runRenderLoop(() => {
             if (scene) {
                 scene.render();
