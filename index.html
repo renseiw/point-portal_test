@@ -3,92 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MindAR.js AR Anwendung</title>
-    <!-- MindAR.js -->
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar/dist/mindar-three.prod.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.136.0/build/three.min.js"></script>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-        }
-        canvas {
-            display: block;
-        }
-    </style>
+    <title>Babylon.js AR Example</title>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
 </head>
 <body>
-    <div id="ar-container" style="width: 100vw; height: 100vh;"></div>
+    <canvas id="renderCanvas" touch-action="none" style="width: 100vw; height: 100vh; display: block;"></canvas>
     <script>
-        // Initialisierung
-        const startAR = async () => {
-            const mindarThree = new window.MINDAR.Three({
-                container: document.querySelector("#ar-container"),
-                imageTargetSrc: "https://cdn.jsdelivr.net/npm/mind-ar/examples/assets/targets/band-example.mind"
+        const canvas = document.getElementById("renderCanvas");
+        const engine = new BABYLON.Engine(canvas, true);
+
+        // Create the basic scene
+        const createScene = async function () {
+            const scene = new BABYLON.Scene(engine);
+
+            // Create a basic camera
+            const camera = new BABYLON.FreeCamera("camera1", new BABYLON.Vector3(0, 1.6, 0), scene);
+            camera.attachControl(canvas, true);
+
+            // Add a light
+            const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+            light.intensity = 0.7;
+
+            // Add a sphere
+            const sphere = BABYLON.MeshBuilder.CreateSphere("sphere", { diameter: 0.5 }, scene);
+            sphere.position.y = 1;
+
+            // Add a ground plane
+            const ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 4, height: 4 }, scene);
+            ground.position.y = 0;
+
+            // Enable WebXR for AR functionality
+            const xr = await scene.createDefaultXRExperienceAsync({
+                uiOptions: {
+                    sessionMode: "immersive-ar", // Use AR mode
+                },
+                optionalFeatures: ["hit-test"], // Optional feature for placing objects
             });
 
-            const { renderer, scene, camera } = mindarThree;
+            // Add hit-test for placing the sphere
+            const hitTest = xr.baseExperience.featuresManager.enableFeature(
+                BABYLON.WebXRHitTest,
+                "latest",
+                { preferredHandedness: "none" }
+            );
 
-            // Licht hinzufügen
-            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-            scene.add(light);
-
-            // Kreis erstellen
-            const circleGeometry = new THREE.CircleGeometry(0.55, 32);
-            const circleMaterial = new THREE.MeshBasicMaterial({ color: 0x0077ff, side: THREE.DoubleSide });
-            const circle = new THREE.Mesh(circleGeometry, circleMaterial);
-            circle.rotation.x = -Math.PI / 2; // Horizontal platzieren
-            circle.position.y = 0.01; // Leicht über dem Boden
-            scene.add(circle);
-
-            // Quader erstellen (aber versteckt)
-            const quads = [];
-            const quadGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-            const quadMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-
-            const quadPositions = [
-                { x: 0.6, z: 0 },
-                { x: -0.6, z: 0 },
-                { x: 0, z: 0.6 },
-                { x: 0, z: -0.6 },
-            ];
-
-            quadPositions.forEach((pos) => {
-                const quad = new THREE.Mesh(quadGeometry, quadMaterial);
-                quad.position.set(pos.x, 0.1, pos.z);
-                quad.visible = false; // Quader unsichtbar starten
-                scene.add(quad);
-                quads.push(quad);
-            });
-
-            // Funktion zur Überprüfung, ob der Benutzer über dem Kreis ist
-            const isOverCircle = (cameraPosition) => {
-                const dx = cameraPosition.x - circle.position.x;
-                const dz = cameraPosition.z - circle.position.z;
-                const distance = Math.sqrt(dx * dx + dz * dz);
-                return distance <= 0.55; // Benutzer ist über dem Kreis
-            };
-
-            // Animation/Render-Schleife
-            renderer.setAnimationLoop(() => {
-                const cameraPosition = camera.position; // Kamera-Position abrufen
-                if (isOverCircle(cameraPosition)) {
-                    // Quader sichtbar machen, wenn der Benutzer über dem Kreis ist
-                    quads.forEach((quad) => (quad.visible = true));
-                } else {
-                    // Quader verstecken, wenn der Benutzer nicht über dem Kreis ist
-                    quads.forEach((quad) => (quad.visible = false));
+            // Update sphere position based on hit-test results
+            hitTest.onHitTestResultObservable.add((results) => {
+                if (results.length) {
+                    const hitPoint = results[0].position;
+                    sphere.position.copyFrom(hitPoint);
+                    sphere.visibility = 1; // Make sphere visible if a hit is found
                 }
-
-                renderer.render(scene, camera);
             });
 
-            // AR starten
-            await mindarThree.start();
+            return scene;
         };
 
-        // AR starten, wenn die Seite geladen wird
-        window.onload = startAR;
+        // Initialize the scene
+        createScene().then((scene) => {
+            engine.runRenderLoop(() => {
+                scene.render();
+            });
+        });
+
+        // Resize the engine on window resize
+        window.addEventListener("resize", () => {
+            engine.resize();
+        });
     </script>
 </body>
 </html>
