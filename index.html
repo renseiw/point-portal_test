@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Babylon.js AR Debug</title>
+    <title>Babylon.js AR - Camera Fix</title>
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
     <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
@@ -15,35 +15,39 @@
         const canvas = document.getElementById("renderCanvas");
         const engine = new BABYLON.Engine(canvas, true);
 
-        let scene, xrHelper, circle, quads = [];
+        let scene, xrHelper, circle;
 
         async function createScene() {
-            // Scene setup
             scene = new BABYLON.Scene(engine);
             scene.clearColor = new BABYLON.Color4(0, 0, 0, 0); // Transparent background
             const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
 
-            // Initialize XR experience
+            // Create XR experience
             xrHelper = await scene.createDefaultXRExperienceAsync({
                 floorMeshes: []
             });
 
-            // Create a basic object for testing
-            const box = BABYLON.MeshBuilder.CreateBox("box", { size: 0.2 }, scene);
-            box.position.set(0, 1, 0);
+            // Button to start AR session
+            document.getElementById("start-ar").addEventListener("click", async () => {
+                try {
+                    // Request camera access
+                    await navigator.mediaDevices.getUserMedia({ video: true });
+                    console.log("Camera access granted");
 
-            // Add AR session button functionality
-            document.getElementById("start-ar").addEventListener("click", () => {
-                xrHelper.baseExperience.enterXRAsync("immersive-ar", "local-floor").then(() => {
+                    // Start AR session
+                    await xrHelper.baseExperience.enterXRAsync("immersive-ar", "local-floor");
                     console.log("AR session started");
 
-                    // Add the circle when AR session starts
+                    // Add a circle to the AR scene
                     circle = BABYLON.MeshBuilder.CreateDisc("circle", { radius: 0.55, tessellation: 64 }, scene);
                     const circleMaterial = new BABYLON.StandardMaterial("circleMaterial", scene);
                     circleMaterial.diffuseColor = new BABYLON.Color3(0, 0.5, 1);
                     circle.material = circleMaterial;
                     circle.position.y = 0.01; // Slightly above the floor
-                }).catch(console.error);
+
+                } catch (err) {
+                    console.error("Failed to start AR session or camera access:", err);
+                }
             });
 
             return scene;
